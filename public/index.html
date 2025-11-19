@@ -103,6 +103,66 @@
         cursor: pointer;
         margin-top: 10px;
     }
+	
+	/* ===========================
+   MOBİL DÜZEN (max 768px)
+   =========================== */
+@media (max-width: 768px) {
+
+    /* Sol menü yukarı taşınacak */
+    #left {
+        position: static;
+        width: 100%;
+        height: auto;
+        border-right: none;
+    }
+
+    #searchBox {
+        width: 95%;
+    }
+
+    #titleList a {
+        font-size: 14px;
+        padding: 8px 0;
+    }
+
+    /* İçerik alanı tam genişlik */
+    #content {
+        margin-left: 0;
+        width: 100%;
+        padding: 15px;
+    }
+
+    h1 {
+        font-size: 28px;
+    }
+
+    #subtitle {
+        font-size: 14px;
+        width: 100%;
+    }
+
+    /* Entry kutuları */
+    .entry {
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 14px;
+    }
+
+    /* textarea ve inputlar */
+    input[type=text],
+    textarea {
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 14px;
+    }
+
+    /* Yeni başlık kutusu */
+    .box {
+        padding: 10px;
+    }
+}
+
 </style>
 </head>
 
