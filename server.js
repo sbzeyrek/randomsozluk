@@ -6,6 +6,41 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+const cookieParser = require("cookie-parser");
+app.use(cookieParser());
+
+// Admin şifre hash
+const ADMIN_HASH = "$2b$10$L2nKB5QyIiVYq7ehQBwXReTwqjYxhFTU60sOvJFiypHJD2OX2tEaK";
+
+const bcrypt = require("bcryptjs");
+
+// Admin giriş POST
+app.post("/admin/login", async (req, res) => {
+    const { password } = req.body;
+
+    const ok = await bcrypt.compare(password, ADMIN_HASH);
+    if (!ok) return res.json({ error: "Şifre yanlış!" });
+
+    // Cookie veriyoruz (HTTP-only = çalınamaz)
+    res.cookie("admin", "ok", {
+        httpOnly: true,
+        sameSite: "strict",
+        secure: false // Render'da true yapacağız
+    });
+
+    res.json({ ok: true });
+});
+
+// Admin koruma middleware
+function requireAdmin(req, res, next) {
+    if (req.cookies.admin === "ok") return next();
+    return res.status(403).send("Yetkin yok!");
+}
+
+app.get("/admin", requireAdmin, (req, res) => {
+    res.sendFile(path.join(__dirname, "admin", "dashboard.html"));
+});
+
 const Database = require("better-sqlite3");
 const db = new Database("./data/words.db");
 
