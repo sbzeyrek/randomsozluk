@@ -6,6 +6,27 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+const Database = require("better-sqlite3");
+const db = new Database("./data/words.db");
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS titles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    folder TEXT UNIQUE,
+    title TEXT,
+    created_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    folder TEXT,
+    nick TEXT,
+    text TEXT,
+    date TEXT
+);
+`);
+
+
 // STATIC FRONTEND
 app.use(express.static("public"));
 app.use("/titles", express.static(path.join(__dirname, "titles"))); // <-- önemli
@@ -14,92 +35,73 @@ app.use("/titles", express.static(path.join(__dirname, "titles"))); // <-- önem
 const TITLES_DIR = path.join(__dirname, "titles");
 
 // Başlık listesi (entry sayılarıyla birlikte)
-app.get("/api/titles", async (req, res) => {
-    if (!fs.existsSync(TITLES_DIR)) return res.json([]);
+app.get("/api/titles", (req, res) => {
+    const rows = db.prepare(`
+        SELECT 
+            t.title,
+            t.folder,
+            (SELECT COUNT(*) - 1 FROM entries e WHERE e.folder = t.folder) AS count
+        FROM titles t
+        ORDER BY t.id DESC
+    `).all();
 
-    const folders = await fs.readdir(TITLES_DIR);
-    const result = [];
-
-    for (const f of folders) {
-        const dataFile = path.join(TITLES_DIR, f, "data.json");
-        let entryCount = 0;
-
-        if (fs.existsSync(dataFile)) {
-            const d = await fs.readJson(dataFile);
-            entryCount = Math.max(0, d.length - 1); // ilk entry hariç
-        }
-
-        result.push({
-            folder: f,
-            title: f.replace(/-/g, " "),
-            count: entryCount
-        });
-    }
-
-    res.json(result);
+    res.json(rows);
 });
 
+
 // Yeni başlık oluştur
-app.post("/api/new-title", async (req, res) => {
+app.post("/api/new-title", (req, res) => {
     const { title, nick, text } = req.body;
 
     if (!title || !nick || !text)
         return res.json({ error: "Boş bıraktığın yer var!" });
 
     const folderName = title.toLowerCase().replace(/ /g, "-");
-    const titlePath = path.join(TITLES_DIR, folderName);
 
-    await fs.ensureDir(titlePath);
+    // Başlık tabloya
+    db.prepare(`
+        INSERT INTO titles (folder, title, created_at)
+        VALUES (?, ?, ?)
+    `).run(folderName, title, new Date().toISOString());
 
-    const dataFile = path.join(titlePath, "data.json");
-
-    const entry = {
-        nick,
-        text,
-        date: new Date().toISOString()
-    };
-
-    await fs.writeJson(dataFile, [entry], { spaces: 2 });
-
-    const htmlFile = path.join(titlePath, "index.html");
-    const template = generateTitleHTML(title);
-    await fs.writeFile(htmlFile, template);
+    // İlk entry tabloya
+    db.prepare(`
+        INSERT INTO entries (folder, nick, text, date)
+        VALUES (?, ?, ?, ?)
+    `).run(folderName, nick, text, new Date().toISOString());
 
     res.json({ ok: true, folder: folderName });
 });
 
+
 // Belirli başlığın entry’leri al
-app.get("/api/title/:name", async (req, res) => {
+app.get("/api/title/:name", (req, res) => {
     const name = req.params.name;
-    const dataFile = path.join(TITLES_DIR, name, "data.json");
 
-    if (!fs.existsSync(dataFile)) return res.json([]);
+    const rows = db.prepare(`
+        SELECT *
+        FROM entries
+        WHERE folder = ?
+        ORDER BY id ASC
+    `).all(name);
 
-    const data = await fs.readJson(dataFile);
-    res.json(data);
+    res.json(rows);
 });
 
+
 // Başlığa entry ekle
-app.post("/api/title/:name/add", async (req, res) => {
+app.post("/api/title/:name/add", (req, res) => {
     const name = req.params.name;
     const { nick, text } = req.body;
 
-    const dataFile = path.join(TITLES_DIR, name, "data.json");
-    let data = [];
-
-    if (fs.existsSync(dataFile))
-        data = await fs.readJson(dataFile);
-
-    data.push({
-        nick,
-        text,
-        date: new Date().toISOString()
-    });
-
-    await fs.writeJson(dataFile, data, { spaces: 2 });
+    db.prepare(`
+        INSERT INTO entries (folder, nick, text, date)
+        VALUES (?, ?, ?, ?)
+    `).run(name, nick, text, new Date().toISOString());
 
     res.json({ ok: true });
 });
+
 
 // Başlık sayfası HTML şablonu
 function generateTitleHTML(title) {
