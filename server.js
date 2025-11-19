@@ -203,63 +203,80 @@ function generateTitleHTML(title) {
     }
 	
 	/* ===========================
-   MOBİL DÜZEN (max 768px)
+   MOBİL TASARIM (max 768px)
    =========================== */
 @media (max-width: 768px) {
 
-    /* Sol menü yukarı taşınacak */
+    body {
+        font-size: 14px;
+    }
+
+    /* Sidebar mobilde yukarı çıkar */
     #left {
         position: static;
         width: 100%;
         height: auto;
         border-right: none;
+        padding: 10px;
+        box-sizing: border-box;
     }
 
     #searchBox {
-        width: 95%;
+        width: 100%;
+        box-sizing: border-box;
     }
 
     #titleList a {
+        padding: 10px 0;
         font-size: 14px;
-        padding: 8px 0;
+        border-bottom: 1px solid #555;
     }
 
-    /* İçerik alanı tam genişlik */
+    /* İçerik sağdan sola kaymayı önler */
     #content {
         margin-left: 0;
         width: 100%;
         padding: 15px;
+        box-sizing: border-box;
     }
 
     h1 {
         font-size: 28px;
     }
 
-    #subtitle {
-        font-size: 14px;
-        width: 100%;
+    h2 {
+        font-size: 20px;
+        text-align: center;
     }
 
-    /* Entry kutuları */
-    .entry {
-        width: 100%;
-        box-sizing: border-box;
-        font-size: 14px;
-    }
-
-    /* textarea ve inputlar */
-    input[type=text],
-    textarea {
-        width: 100%;
-        box-sizing: border-box;
-        font-size: 14px;
-    }
-
-    /* Yeni başlık kutusu */
     .box {
+        padding: 12px;
+        margin-bottom: 15px;
+    }
+
+    .entry {
+        font-size: 14px;
         padding: 10px;
     }
+
+    .entry-info {
+        font-size: 11px;
+    }
+
+    /* Input ve textarea tam genişlik olur */
+    input[type=text],
+    textarea,
+    button {
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 14px;
+    }
+
+    textarea {
+        height: 120px;
+    }
 }
+
 
 </style>
 
