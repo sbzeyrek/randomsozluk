@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>randomsözlük - random bilgi kaynağı</title>
+
+<style>
+    body {
+        margin: 0;
+        background-color: #5a5a1e;
+        font-family: Verdana, Arial, sans-serif;
+        color: #e1e1b0;
+        font-size: 12px;
+    }
+
+    a { color: #ffec8f; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* --- SOL TARAF: SIDEBAR (1999 GÖRÜNÜMÜ) --- */
+    #left {
+        width: 180px;
+        background-color: #464619;
+        height: 100vh;
+        overflow-y: auto;
+        border-right: 1px solid #242400;
+        padding: 10px;
+        position: fixed;
+        top: 0;
+        left: 0;
+    }
+
+    #searchBox {
+        width: 160px;
+        padding: 4px;
+        background-color: #dfdfc3;
+        border: 1px solid #333;
+        margin-bottom: 10px;
+    }
+
+    #titleList a {
+        display: block;
+        padding: 4px 0;
+        border-bottom: 1px solid #555;
+        font-size: 12px;
+    }
+
+    .entry-count {
+        color: #b8b894;
+        font-size: 10px;
+        float: right;
+    }
+
+    /* --- SAĞ TARAF: ANA CONTENT --- */
+    #content {
+        margin-left: 210px;    /* sidebar boşluğu */
+        padding: 25px;
+        width: 650px;
+    }
+
+    h1 {
+        font-family: "Comic Sans MS";
+        font-size: 40px;
+        text-align: center;
+        color: #ffdf00;
+        text-shadow: 2px 2px 3px black;
+        margin: 0;
+    }
+
+    h1 a {
+        color: #ffdf00;
+        text-decoration: none;
+    }
+
+    h1 a:hover {
+        text-decoration: underline;
+    }
+
+    #subtitle {
+        text-align: center;
+        font-size: 15px;
+        margin-bottom: 25px;
+        margin-left: auto;
+        margin-right: auto;
+        display: block;
+        width: 100%;
+    }
+
+    .box {
+        background-color: #464619;
+        padding: 15px;
+        border: 1px solid #242400;
+        margin-bottom: 20px;
+    }
+
+    input[type=text] {
+        width: 95%;
+        padding: 5px;
+        background-color: #dfdfc3;
+        border: 1px solid #333;
+        font-size: 12px;
+    }
+
+    textarea {
+        width: 95%;
+        height: 130px;
+        padding: 5px;
+        background-color: white; /* 1999 görünümü */
+        border: 1px solid #111;
+        font-size: 12px;
+        color: black;
+    }
+
+    button {
+        background-color: #e3bf00;
+        border: 1px solid black;
+        padding: 5px 12px;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+
+    .entry {
+        background-color: #3c3c14;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #222;
+        position: relative;
+    }
+
+    .entry-info {
+        font-size: 10px;
+        color: #b8b894;
+        margin-bottom: 5px;
+    }
+
+    .entry-content {
+        margin-top: 5px;
+    }
+
+    #entryForm {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #666;
+    }
+</style>
+</head>
+
+<body>
+
+<!-- SOL TARAF -->
+<div id="left">
+    <input type="text" id="searchBox" placeholder="başlık ara" onkeyup="filterTitles()">
+    <h4>başlıklar</h4>
+    <div id="titleList"></div>
+</div>
+
+<!-- SAĞ TARAF -->
+<div id="content">
+
+    <h1><a href="#" onclick="goHome()">randomsözlük</a></h1>
+    <div id="subtitle">random bilgi kaynağı<br><br><br><br><br><br>çaylaklığa dayanamadım bende kendiminkini yazdım arkadaşlar hoşgeldiniz. öyle takılın şimdilik. ciddiyete gerek filan yok kafanıza göre. sallayın.</div>
+
+    <!-- başlık açma -->
+    <div id="newTitleBox" class="box">
+        <h3>yeni başlık aç</h3>
+        <input type="text" id="newTitle" placeholder="başlık adı">
+        <br><br>
+        <h4>ilk entry'i gir</h4>
+        <input type="text" id="firstEntryNick" placeholder="nick'in">
+        <br><br>
+        <textarea id="firstEntryText" placeholder="nöronlarından geçenler"></textarea>
+        <br>
+        <button onclick="addTitleWithEntry()">başlığı ve entry'i ekle</button>
+    </div>
+
+    <!-- entry alanı -->
+    <div id="entryArea" style="display:none;">
+        <div class="box">
+            <h3 id="currentTitle"></h3>
+        </div>
+
+        <div id="entries"></div>
+
+        <!-- Entry yazma formu - entry'lerin altında -->
+        <div id="entryForm" class="box">
+            <h4>entry gir</h4>
+            <input type="text" id="nickname" placeholder="nick'in">
+            <br><br>
+            <textarea id="entryText" placeholder="nöronlarından geçenler"></textarea>
+            <br>
+            <button onclick="addEntry()">yolla</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let sozluk = JSON.parse(localStorage.getItem("sozlukData") || "{}");
+    let current = null;
+
+    function save() {
+        localStorage.setItem("sozlukData", JSON.stringify(sozluk));
+    }
+
+    function renderTitles() {
+        let list = document.getElementById("titleList");
+        list.innerHTML = "";
+
+        let titles = Object.keys(sozluk);
+        if (titles.length === 0) {
+            list.innerHTML = "<i>henüz başlık yok</i>";
+            return;
+        }
+
+        titles.forEach(t => {
+            let link = document.createElement("a");
+            link.href = "#";
+            
+            // Entry sayısını hesapla (ilk entry hariç)
+            let entryCount = Math.max(0, sozluk[t].length - 1);
+            let countText = entryCount > 0 ? ` <span class="entry-count">(${entryCount})</span>` : '';
+            
+            link.innerHTML = t + countText;
+            link.onclick = () => openTitle(t);
+            list.appendChild(link);
+        });
+    }
+
+    function addTitleWithEntry() {
+        let title = document.getElementById("newTitle").value.trim();
+        let nick = document.getElementById("firstEntryNick").value.trim();
+        let text = document.getElementById("firstEntryText").value.trim();
+        
+        if (title === "" || nick === "" || text === "") {
+            alert("Başlık, nick ve entry alanları boş olamaz!");
+            return;
+        }
+
+        if (!sozluk[title]) {
+            sozluk[title] = [];
+        }
+        
+        // İlk entry'i ekle
+        sozluk[title].push({ 
+            nick, 
+            text, 
+            date: new Date().toISOString() 
+        });
+        
+        save();
+        renderTitles();
+
+        // Formu temizle
+        document.getElementById("newTitle").value = "";
+        document.getElementById("firstEntryNick").value = "";
+        document.getElementById("firstEntryText").value = "";
+        
+        alert("Başlık ve ilk entry başarıyla eklendi!");
+    }
+
+    function openTitle(t) {
+        current = t;
+        document.getElementById("entryArea").style.display = "block";
+        document.getElementById("currentTitle").innerText = t;
+        
+        // Yeni başlık açma kutusunu gizle
+        document.getElementById("newTitleBox").style.display = "none";
+
+        let entriesDiv = document.getElementById("entries");
+        entriesDiv.innerHTML = "";
+
+        if (sozluk[t].length === 0) {
+            entriesDiv.innerHTML = "<div class='entry'><i>bu başlıkta henüz entry yok, ilk entry'i sen gir!</i></div>";
+        } else {
+            sozluk[t].forEach(e => {
+                let d = document.createElement("div");
+                d.className = "entry";
+                
+                // Tarih ve saat formatını düzenle
+                let date = new Date(e.date);
+                let dateStr = date.toLocaleDateString('tr-TR') + " " + 
+                             date.toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'});
+                
+                d.innerHTML = 
+                    "<div class='entry-info'><b>" + e.nick + "</b> - " + dateStr + "</div>" +
+                    "<div class='entry-content'>" + e.text + "</div>";
+                entriesDiv.appendChild(d);
+            });
+        }
+        
+        // Entry formunu göster
+        document.getElementById("entryForm").style.display = "block";
+    }
+
+    function addEntry() {
+        let nick = document.getElementById("nickname").value.trim();
+        let text = document.getElementById("entryText").value.trim();
+        if (nick === "" || text === "") return;
+
+        sozluk[current].push({ 
+            nick, 
+            text, 
+            date: new Date().toISOString() 
+        });
+        save();
+
+        document.getElementById("nickname").value = "";
+        document.getElementById("entryText").value = "";
+        openTitle(current);
+        renderTitles(); // Entry sayısını güncelle
+    }
+
+    function goHome() {
+        // Ana sayfaya dön
+        document.getElementById("entryArea").style.display = "none";
+        document.getElementById("newTitleBox").style.display = "block";
+        document.getElementById("entryForm").style.display = "none";
+        current = null;
+    }
+
+    function filterTitles() {
+        let q = document.getElementById("searchBox").value.toLowerCase();
+        let all = document.querySelectorAll("#titleList a");
+
+        all.forEach(a => {
+            a.style.display = a.innerText.toLowerCase().includes(q) ? "block" : "none";
+        });
+    }
+
+    renderTitles();
+</script>
+</body>
+</html>

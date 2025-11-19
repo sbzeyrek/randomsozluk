@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>başlık</title>
+
+<style>
+    body {
+        margin: 0;
+        background-color: #5a5a1e;
+        font-family: Verdana, Arial, sans-serif;
+        color: #e1e1b0;
+        font-size: 12px;
+    }
+
+    a { color: #ffec8f; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    #left {
+        width: 180px;
+        background-color: #464619;
+        height: 100vh;
+        overflow-y: auto;
+        border-right: 1px solid #242400;
+        padding: 10px;
+        position: fixed;
+        top: 0;
+        left: 0;
+    }
+
+    #content {
+        margin-left: 210px;
+        padding: 25px;
+        width: 650px;
+    }
+
+    .entry {
+        background-color: #3c3c14;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #222;
+    }
+
+    button {
+        background-color: #e3bf00;
+        border: 1px solid black;
+        padding: 5px 12px;
+        cursor: pointer;
+    }
+
+    input, textarea {
+        width: 95%;
+        padding: 5px;
+    }
+
+    textarea {
+        height: 120px;
+    }
+</style>
+</head>
+
+<body>
+
+<div id="content">
+
+    <h1 id="title"></h1>
+    <div id="entries"></div>
+
+    <h3>entry gir</h3>
+    <input id="nick" placeholder="nick">
+    <br><br>
+    <textarea id="text" placeholder="nöronlarından geçenler"></textarea>
+    <br>
+    <button onclick="addEntry()">yolla</button>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const id = params.get("id");
+
+async function loadTopic() {
+    const res = await fetch(`/api/topic/${id}`);
+    const topic = await res.json();
+
+    document.getElementById("title").innerText = topic.title;
+
+    const div = document.getElementById("entries");
+    div.innerHTML = "";
+
+    topic.entries.forEach(e => {
+        let box = document.createElement("div");
+        box.className = "entry";
+
+        let d = new Date(e.date);
+
+        box.innerHTML =
+            `<b>${e.nick}</b> - ${d.toLocaleDateString("tr-TR")} ${d.toLocaleTimeString("tr-TR")}<br><br>${e.text}`;
+
+        div.appendChild(box);
+    });
+}
+
+async function addEntry() {
+    let nick = document.getElementById("nick").value.trim();
+    let text = document.getElementById("text").value.trim();
+
+    if (!nick || !text) return;
+
+    await fetch(`/api/topic/${id}/entry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nick, text })
+    });
+
+    loadTopic();
+}
+
+loadTopic();
+</script>
+
+</body>
+</html>
