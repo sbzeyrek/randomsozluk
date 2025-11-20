@@ -7,98 +7,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const cookieParser = require("cookie-parser");
-const bcrypt = require("bcryptjs");
 app.use(cookieParser());
+const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
-function requireAdmin(req, res, next) {
-    if (!req.cookies.admin) return res.status(403).json({ error: "yetki yok" });
-
-    bcrypt.compare(req.cookies.admin, ADMIN_HASH, (err, ok) => {
-        if (ok) next();
-        else return res.status(403).json({ error: "yetki yok" });
-    });
-}
-
-app.post("/admin-login", async (req, res) => {
-    const { password } = req.body;
-    if (!password) return res.json({ error: "parola yok" });
-
-    const ok = await bcrypt.compare(password, ADMIN_HASH);
-    if (!ok) return res.json({ error: "yanlış parola" });
-
-    res.cookie("admin", password, {
-        httpOnly: true,
-        sameSite: "strict",
-        maxAge: 1000 * 60 * 60 * 24 * 30
-    });
-
-    res.json({ ok: true });
-});
-
-app.use("/admin-54f6a12ca898b", express.static(path.join(__dirname, "admin-54f6a12ca898b")));
-
-app.post("/admin-delete-title/:folder", requireAdmin, async (req, res) => {
-    const folder = req.params.folder;
-    const dir = path.join(__dirname, "titles", folder);
-
-    if (!fs.existsSync(dir)) {
-        return res.json({ error: "böyle bir başlık yok" });
-    }
-
-    await fs.remove(dir);
-    res.json({ ok: true });
-});
-
-async function deleteTitle(folder) {
-    if (!confirm("Bu başlık tamamen silinsin mi?")) return;
-
-    await fetch("/admin-delete-title/" + folder, { method:"POST" });
-    loadTitleManager();
-    loadStats();
-}
-
-
-app.post("/admin-delete-entry", requireAdmin, async (req, res) => {
-    const { folder, index } = req.body;
-
-    if (folder == null || index == null)
-        return res.json({ error: "eksik parametre" });
-
-    const file = path.join(__dirname, "titles", folder, "data.json");
-
-    if (!fs.existsSync(file)) return res.json({ error: "bulunamadı" });
-
-    let data = await fs.readJson(file);
-
-    if (!data[index]) return res.json({ error: "entry yok" });
-
-    data.splice(index, 1);
-    await fs.writeJson(file, data, { spaces: 2 });
-
-    res.json({ ok: true });
-});
-
-
-// senin hashin
 const ADMIN_HASH = "$2b$10$L2nKB5QyIiVYq7ehQBwXReTwqjYxhFTU60sOvJFiypHJD2OX2tEaK";
 
-app.post("/admin-54f6a12ca898b/login", async (req, res) => {
-    const { password } = req.body;
-
-    const ok = await bcrypt.compare(password, ADMIN_HASH);
-    if (!ok) return res.json({ error: "yanlış şifre!" });
-
-    res.cookie("admin", "ok", {
-        httpOnly: true,
-        sameSite: "strict",
-        secure: true  // Render için zorunlu
-    });
-
-    res.json({ ok: true });
-});
-
-app.use("/admin-54f6a12ca898b", express.static(path.join(__dirname, "admin-54f6a12ca898b")));
-
+const ACTIVE_ADMIN_TOKENS = new Set();
+function makeToken() { return crypto.randomBytes(24).toString("hex"); }
 
 const Database = require("better-sqlite3");
 const db = new Database("./data/words.db");
@@ -120,15 +36,11 @@ CREATE TABLE IF NOT EXISTS entries (
 );
 `);
 
-
-// STATIC FRONTEND
 app.use(express.static("public"));
 app.use("/titles", express.static(path.join(__dirname, "titles"))); // <-- önemli
 
-// TITLES ROOT
 const TITLES_DIR = path.join(__dirname, "titles");
 
-// Başlık listesi (entry sayılarıyla birlikte)
 app.get("/api/titles", (req, res) => {
     const rows = db.prepare(`
         SELECT 
@@ -142,8 +54,6 @@ app.get("/api/titles", (req, res) => {
     res.json(rows);
 });
 
-
-// Yeni başlık oluştur
 app.post("/api/new-title", (req, res) => {
     const { title, nick, text } = req.body;
 
@@ -152,23 +62,25 @@ app.post("/api/new-title", (req, res) => {
 
     const folderName = title.toLowerCase().replace(/ /g, "-");
 
-    // Başlık tabloya
     db.prepare(`
         INSERT INTO titles (folder, title, created_at)
         VALUES (?, ?, ?)
     `).run(folderName, title, new Date().toISOString());
 
-    // İlk entry tabloya
     db.prepare(`
         INSERT INTO entries (folder, nick, text, date)
         VALUES (?, ?, ?, ?)
     `).run(folderName, nick, text, new Date().toISOString());
 
+    const titlePath = path.join(TITLES_DIR, folderName);
+    fs.ensureDirSync(titlePath);
+    const htmlFile = path.join(titlePath, "index.html");
+    const template = generateTitleHTML(title);
+    fs.writeFileSync(htmlFile, template, "utf8");
+
     res.json({ ok: true, folder: folderName });
 });
 
-
-// Belirli başlığın entry’leri al
 app.get("/api/title/:name", (req, res) => {
     const name = req.params.name;
 
@@ -182,8 +94,6 @@ app.get("/api/title/:name", (req, res) => {
     res.json(rows);
 });
 
-
-// Başlığa entry ekle
 app.post("/api/title/:name/add", (req, res) => {
     const name = req.params.name;
     const { nick, text } = req.body;
@@ -196,8 +106,101 @@ app.post("/api/title/:name/add", (req, res) => {
     res.json({ ok: true });
 });
 
+app.post("/api/admin/login", async (req, res) => {
+    const { password } = req.body;
+    if (!password) return res.json({ error: "parola gerekli" });
 
-// Başlık sayfası HTML şablonu
+    const ok = await bcrypt.compare(password, ADMIN_HASH);
+    if (!ok) return res.json({ error: "hatalı parola" });
+
+    const token = makeToken();
+    ACTIVE_ADMIN_TOKENS.add(token);
+
+    // render/https ortamında secure: true olmalı; local test için false olabilir
+    res.cookie("admin_token", token, {
+        httpOnly: true,
+        sameSite: "strict",
+        secure: false,
+        maxAge: 1000 * 60 * 60 * 24 // 1 gün
+    });
+
+    res.json({ ok: true });
+});
+
+function requireAdmin(req, res, next) {
+    const token = req.cookies && req.cookies.admin_token;
+    if (!token || !ACTIVE_ADMIN_TOKENS.has(token)) {
+        return res.status(401).json({ error: "yetki yok" });
+    }
+    next();
+}
+
+app.get("/api/admin/check", requireAdmin, (req, res) => {
+    res.json({ ok: true });
+});
+
+app.post("/api/admin/logout", requireAdmin, (req, res) => {
+    const token = req.cookies && req.cookies.admin_token;
+    if (token) ACTIVE_ADMIN_TOKENS.delete(token);
+    res.clearCookie("admin_token");
+    res.json({ ok: true });
+});
+
+app.get("/api/admin/titles", requireAdmin, (req, res) => {
+    const rows = db.prepare(`
+        SELECT 
+            t.title,
+            t.folder,
+            (SELECT COUNT(*) FROM entries e WHERE e.folder = t.folder) AS count
+        FROM titles t
+        ORDER BY t.id DESC
+    `).all();
+    res.json(rows);
+});
+
+app.get("/api/admin/title/:name", requireAdmin, (req, res) => {
+    const name = req.params.name;
+    const rows = db.prepare(`
+        SELECT id, nick, text, date FROM entries
+        WHERE folder = ?
+        ORDER BY id ASC
+    `).all(name);
+    res.json(rows);
+});
+
+app.delete("/api/admin/delete-title/:folder", requireAdmin, async (req, res) => {
+    const folder = req.params.folder;
+
+    db.prepare("DELETE FROM entries WHERE folder = ?").run(folder);
+    db.prepare("DELETE FROM titles WHERE folder = ?").run(folder);
+
+    try {
+        await fs.remove(path.join(TITLES_DIR, folder));
+    } catch (e) { /* ignore */ }
+
+    res.json({ ok: true });
+});
+
+app.delete("/api/admin/delete-entry/:folder/:id", requireAdmin, (req, res) => {
+    const { folder, id } = req.params;
+    db.prepare(`DELETE FROM entries WHERE id = ? AND folder = ?`).run(id, folder);
+    res.json({ ok: true });
+});
+
+app.get("/api/admin/stats", requireAdmin, (req, res) => {
+    const titlesCount = db.prepare("SELECT COUNT(*) as c FROM titles").get().c;
+    const entriesCount = db.prepare("SELECT COUNT(*) as c FROM entries").get().c;
+    const lastTitle = db.prepare("SELECT title FROM titles ORDER BY id DESC LIMIT 1").get();
+    const lastEntry = db.prepare("SELECT text FROM entries ORDER BY id DESC LIMIT 1").get();
+
+    res.json({
+        titles: titlesCount,
+        entries: entriesCount,
+        lastTitle: lastTitle ? lastTitle.title : null,
+        lastEntry: lastEntry ? lastEntry.text : null
+    });
+});
+
 function generateTitleHTML(title) {
     const folder = title.toLowerCase().replace(/ /g, "-");
 
@@ -486,5 +489,5 @@ load();
 `;
 }
 
-
+// server listen
 app.listen(3000, () => console.log("Çalışıyor: http://localhost:3000"));

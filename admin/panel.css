@@ -1,0 +1,54 @@
+body {
+    background-color: #5a5a1e;
+    font-family: Verdana, sans-serif;
+    color: #e1e1b0;
+    margin: 0;
+}
+
+.login-box {
+    width: 300px;
+    margin: 140px auto;
+    background: #464619;
+    padding: 20px;
+    border: 1px solid #242400;
+    text-align: center;
+}
+
+input, button {
+    width: 90%;
+    padding: 8px;
+    margin: 8px 0;
+    background: #dfdfc3;
+    border: 1px solid #222;
+    font-size: 14px;
+}
+
+button {
+    background: #e3bf00;
+    cursor: pointer;
+}
+
+.topbar {
+    background: #464619;
+    padding: 10px;
+    border-bottom: 1px solid #242400;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.container {
+    padding: 20px;
+}
+
+.title-item, .entry-item {
+    background: #3c3c14;
+    padding: 10px;
+    border: 1px solid #222;
+    margin-bottom: 8px;
+}
+
+button.small {
+    padding: 5px 8px;
+    font-size: 12px;
+}
