@@ -6,8 +6,6 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/admin", express.static(path.join(__dirname, "admin")));
-
 const cookieParser = require("cookie-parser");
 app.use(cookieParser());
 const bcrypt = require("bcryptjs");
@@ -40,6 +38,8 @@ CREATE TABLE IF NOT EXISTS entries (
 
 app.use(express.static("public"));
 app.use("/titles", express.static(path.join(__dirname, "titles"))); // <-- önemli
+app.use("/admin", express.static(path.join(__dirname, "admin")));
+
 
 const TITLES_DIR = path.join(__dirname, "titles");
 
