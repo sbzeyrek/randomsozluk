@@ -6,6 +6,8 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use("/admin", express.static(path.join(__dirname, "admin")));
+
 const cookieParser = require("cookie-parser");
 app.use(cookieParser());
 const bcrypt = require("bcryptjs");
