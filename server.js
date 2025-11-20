@@ -7,39 +7,98 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const cookieParser = require("cookie-parser");
+const bcrypt = require("bcryptjs");
 app.use(cookieParser());
 
-// Admin şifre hash
-const ADMIN_HASH = "$2b$10$L2nKB5QyIiVYq7ehQBwXReTwqjYxhFTU60sOvJFiypHJD2OX2tEaK";
+function requireAdmin(req, res, next) {
+    if (!req.cookies.admin) return res.status(403).json({ error: "yetki yok" });
 
-const bcrypt = require("bcryptjs");
+    bcrypt.compare(req.cookies.admin, ADMIN_HASH, (err, ok) => {
+        if (ok) next();
+        else return res.status(403).json({ error: "yetki yok" });
+    });
+}
 
-// Admin giriş POST
-app.post("/admin/login", async (req, res) => {
+app.post("/admin-login", async (req, res) => {
     const { password } = req.body;
+    if (!password) return res.json({ error: "parola yok" });
 
     const ok = await bcrypt.compare(password, ADMIN_HASH);
-    if (!ok) return res.json({ error: "Şifre yanlış!" });
+    if (!ok) return res.json({ error: "yanlış parola" });
 
-    // Cookie veriyoruz (HTTP-only = çalınamaz)
-    res.cookie("admin", "ok", {
+    res.cookie("admin", password, {
         httpOnly: true,
         sameSite: "strict",
-        secure: false // Render'da true yapacağız
+        maxAge: 1000 * 60 * 60 * 24 * 30
     });
 
     res.json({ ok: true });
 });
 
-// Admin koruma middleware
-function requireAdmin(req, res, next) {
-    if (req.cookies.admin === "ok") return next();
-    return res.status(403).send("Yetkin yok!");
+app.use("/admin-54f6a12ca898b", express.static(path.join(__dirname, "admin-54f6a12ca898b")));
+
+app.post("/admin-delete-title/:folder", requireAdmin, async (req, res) => {
+    const folder = req.params.folder;
+    const dir = path.join(__dirname, "titles", folder);
+
+    if (!fs.existsSync(dir)) {
+        return res.json({ error: "böyle bir başlık yok" });
+    }
+
+    await fs.remove(dir);
+    res.json({ ok: true });
+});
+
+async function deleteTitle(folder) {
+    if (!confirm("Bu başlık tamamen silinsin mi?")) return;
+
+    await fetch("/admin-delete-title/" + folder, { method:"POST" });
+    loadTitleManager();
+    loadStats();
 }
 
-app.get("/admin", requireAdmin, (req, res) => {
-    res.sendFile(path.join(__dirname, "admin", "dashboard.html"));
+
+app.post("/admin-delete-entry", requireAdmin, async (req, res) => {
+    const { folder, index } = req.body;
+
+    if (folder == null || index == null)
+        return res.json({ error: "eksik parametre" });
+
+    const file = path.join(__dirname, "titles", folder, "data.json");
+
+    if (!fs.existsSync(file)) return res.json({ error: "bulunamadı" });
+
+    let data = await fs.readJson(file);
+
+    if (!data[index]) return res.json({ error: "entry yok" });
+
+    data.splice(index, 1);
+    await fs.writeJson(file, data, { spaces: 2 });
+
+    res.json({ ok: true });
 });
+
+
+// senin hashin
+const ADMIN_HASH = "$2b$10$L2nKB5QyIiVYq7ehQBwXReTwqjYxhFTU60sOvJFiypHJD2OX2tEaK";
+
+app.post("/admin-54f6a12ca898b/login", async (req, res) => {
+    const { password } = req.body;
+
+    const ok = await bcrypt.compare(password, ADMIN_HASH);
+    if (!ok) return res.json({ error: "yanlış şifre!" });
+
+    res.cookie("admin", "ok", {
+        httpOnly: true,
+        sameSite: "strict",
+        secure: true  // Render için zorunlu
+    });
+
+    res.json({ ok: true });
+});
+
+app.use("/admin-54f6a12ca898b", express.static(path.join(__dirname, "admin-54f6a12ca898b")));
+
 
 const Database = require("better-sqlite3");
 const db = new Database("./data/words.db");

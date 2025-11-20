@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>admin girişi</title>
+
+<style>
+    body {
+        margin: 0;
+        background-color: #5a5a1e;
+        font-family: Verdana, Arial, sans-serif;
+        color: #e1e1b0;
+        font-size: 12px;
+    }
+
+    a { color: #ffec8f; text-decoration: none; }
+
+    .login-box {
+        width: 300px;
+        background-color: #464619;
+        border: 1px solid #242400;
+        padding: 20px;
+        margin: 100px auto;
+        text-align: center;
+    }
+
+    input[type=password] {
+        width: 95%;
+        padding: 8px;
+        margin-top: 10px;
+        background-color: #dfdfc3;
+        border: 1px solid #333;
+        font-size: 12px;
+    }
+
+    button {
+        width: 100%;
+        background-color: #e3bf00;
+        border: 1px solid black;
+        padding: 8px;
+        margin-top: 12px;
+        cursor: pointer;
+    }
+
+    #msg {
+        margin-top: 10px;
+        color: #ffec8f;
+    }
+
+    /* Mobil */
+    @media (max-width: 768px) {
+        .login-box {
+            width: 85%;
+            margin-top: 40px;
+        }
+    }
+</style>
+</head>
+
+<body>
+
+<div class="login-box">
+    <h2>admin girişi</h2>
+
+    <input id="pw" type="password" placeholder="şifre">
+    <button onclick="login()">giriş yap</button>
+    <div id="msg"></div>
+</div>
+
+<script>
+async function login() {
+    let pw = document.getElementById("pw").value;
+
+    let r = await fetch("/admin-54f6a12ca898b/login", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ password: pw })
+    });
+
+    let j = await r.json();
+
+    if (j.error) {
+        document.getElementById("msg").innerText = j.error;
+    } else {
+        location.href = "/admin-54f6a12ca898b/dashboard.html";
+    }
+}
+</script>
+
+</body>
+</html>
