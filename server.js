@@ -25,11 +25,7 @@ function makeToken() {
 // ============================
 //  1) *** ADMIN STATIC ROUTE EN ÜSTE ***
 app.use("/admin", express.static(path.join(__dirname, "public/admin")));
-// ============================
 
-// ============================
-// DATABASE
-// ============================
 
 const db = new Database("./data/words.db");
 
