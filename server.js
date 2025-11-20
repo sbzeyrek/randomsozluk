@@ -1,22 +1,36 @@
 const express = require("express");
 const fs = require("fs-extra");
 const path = require("path");
+const cookieParser = require("cookie-parser");
+const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
+const Database = require("better-sqlite3");
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-const cookieParser = require("cookie-parser");
 app.use(cookieParser());
-const bcrypt = require("bcryptjs");
-const crypto = require("crypto");
+
+// ============================
+//  ADMIN AYARLARI
+// ============================
 
 const ADMIN_HASH = "$2b$10$L2nKB5QyIiVYq7ehQBwXReTwqjYxhFTU60sOvJFiypHJD2OX2tEaK";
-
 const ACTIVE_ADMIN_TOKENS = new Set();
-function makeToken() { return crypto.randomBytes(24).toString("hex"); }
 
-const Database = require("better-sqlite3");
+function makeToken() {
+    return crypto.randomBytes(24).toString("hex");
+}
+
+// ============================
+//  1) *** ADMIN STATIC ROUTE EN ÜSTE ***
+app.use("/admin", express.static(path.join(__dirname, "admin")));
+// ============================
+
+// ============================
+// DATABASE
+// ============================
+
 const db = new Database("./data/words.db");
 
 db.exec(`
@@ -36,16 +50,18 @@ CREATE TABLE IF NOT EXISTS entries (
 );
 `);
 
-app.use("/admin", express.static(path.join(__dirname, "admin")));
+// ============================
+// STATIC FRONTEND (admin üstte olmak zorunda)
+// ============================
+
 app.use(express.static("public"));
-app.use("/titles", express.static(path.join(__dirname, "titles"))); // <-- öneml
-
-app.get("/admin", (req, res) => {
-    res.sendFile(path.join(__dirname, "admin", "index.html"));
-});
-
+app.use("/titles", express.static(path.join(__dirname, "titles")));
 
 const TITLES_DIR = path.join(__dirname, "titles");
+
+// ============================
+// API: Başlık listesi
+// ============================
 
 app.get("/api/titles", (req, res) => {
     const rows = db.prepare(`
@@ -60,84 +76,100 @@ app.get("/api/titles", (req, res) => {
     res.json(rows);
 });
 
+// ============================
+// API: Yeni başlık oluştur
+// ============================
+
 app.post("/api/new-title", (req, res) => {
     const { title, nick, text } = req.body;
 
     if (!title || !nick || !text)
         return res.json({ error: "Boş bıraktığın yer var!" });
 
-    const folderName = title.toLowerCase().replace(/ /g, "-");
+    const folder = title.toLowerCase().replace(/ /g, "-");
 
     db.prepare(`
         INSERT INTO titles (folder, title, created_at)
         VALUES (?, ?, ?)
-    `).run(folderName, title, new Date().toISOString());
+    `).run(folder, title, new Date().toISOString());
 
     db.prepare(`
         INSERT INTO entries (folder, nick, text, date)
         VALUES (?, ?, ?, ?)
-    `).run(folderName, nick, text, new Date().toISOString());
+    `).run(folder, nick, text, new Date().toISOString());
 
-    const titlePath = path.join(TITLES_DIR, folderName);
+    // HTML oluştur
+    const titlePath = path.join(TITLES_DIR, folder);
     fs.ensureDirSync(titlePath);
-    const htmlFile = path.join(titlePath, "index.html");
-    const template = generateTitleHTML(title);
-    fs.writeFileSync(htmlFile, template, "utf8");
+    fs.writeFileSync(path.join(titlePath, "index.html"), generateTitleHTML(title));
 
-    res.json({ ok: true, folder: folderName });
+    res.json({ ok: true, folder });
 });
 
+// ============================
+// API: Başlık entryleri
+// ============================
+
 app.get("/api/title/:name", (req, res) => {
-    const name = req.params.name;
+    const folder = req.params.name;
 
     const rows = db.prepare(`
         SELECT *
         FROM entries
         WHERE folder = ?
         ORDER BY id ASC
-    `).all(name);
+    `).all(folder);
 
     res.json(rows);
 });
 
+// ============================
+// API: Entry ekle
+// ============================
+
 app.post("/api/title/:name/add", (req, res) => {
-    const name = req.params.name;
     const { nick, text } = req.body;
+    const folder = req.params.name;
 
     db.prepare(`
         INSERT INTO entries (folder, nick, text, date)
         VALUES (?, ?, ?, ?)
-    `).run(name, nick, text, new Date().toISOString());
+    `).run(folder, nick, text, new Date().toISOString());
 
     res.json({ ok: true });
 });
 
+// ============================
+// ADMIN BACKEND
+// ============================
+
+// Admin login
 app.post("/api/admin/login", async (req, res) => {
     const { password } = req.body;
-    if (!password) return res.json({ error: "parola gerekli" });
+
+    if (!password) return res.json({ error: "Parola gerekli" });
 
     const ok = await bcrypt.compare(password, ADMIN_HASH);
-    if (!ok) return res.json({ error: "hatalı parola" });
+    if (!ok) return res.json({ error: "Yanlış parola" });
 
     const token = makeToken();
     ACTIVE_ADMIN_TOKENS.add(token);
 
-    // render/https ortamında secure: true olmalı; local test için false olabilir
     res.cookie("admin_token", token, {
         httpOnly: true,
         sameSite: "strict",
-        secure: false,
-        maxAge: 1000 * 60 * 60 * 24 // 1 gün
+        secure: false, // Render otomatik HTTPS'te secure'a zorlar
+        maxAge: 86400000
     });
 
     res.json({ ok: true });
 });
 
+// Admin middleware
 function requireAdmin(req, res, next) {
-    const token = req.cookies && req.cookies.admin_token;
-    if (!token || !ACTIVE_ADMIN_TOKENS.has(token)) {
-        return res.status(401).json({ error: "yetki yok" });
-    }
+    const t = req.cookies.admin_token;
+    if (!t || !ACTIVE_ADMIN_TOKENS.has(t))
+        return res.status(401).json({ error: "Yetki yok" });
     next();
 }
 
@@ -145,13 +177,15 @@ app.get("/api/admin/check", requireAdmin, (req, res) => {
     res.json({ ok: true });
 });
 
+// Admin logout
 app.post("/api/admin/logout", requireAdmin, (req, res) => {
-    const token = req.cookies && req.cookies.admin_token;
-    if (token) ACTIVE_ADMIN_TOKENS.delete(token);
+    const t = req.cookies.admin_token;
+    if (t) ACTIVE_ADMIN_TOKENS.delete(t);
     res.clearCookie("admin_token");
     res.json({ ok: true });
 });
 
+// Admin başlık listesi
 app.get("/api/admin/titles", requireAdmin, (req, res) => {
     const rows = db.prepare(`
         SELECT 
@@ -161,50 +195,42 @@ app.get("/api/admin/titles", requireAdmin, (req, res) => {
         FROM titles t
         ORDER BY t.id DESC
     `).all();
+
     res.json(rows);
 });
 
-app.get("/api/admin/title/:name", requireAdmin, (req, res) => {
-    const name = req.params.name;
-    const rows = db.prepare(`
-        SELECT id, nick, text, date FROM entries
-        WHERE folder = ?
-        ORDER BY id ASC
-    `).all(name);
-    res.json(rows);
-});
-
-app.delete("/api/admin/delete-title/:folder", requireAdmin, async (req, res) => {
+// Admin entry listesi
+app.get("/api/admin/title/:folder", requireAdmin, (req, res) => {
     const folder = req.params.folder;
 
-    db.prepare("DELETE FROM entries WHERE folder = ?").run(folder);
-    db.prepare("DELETE FROM titles WHERE folder = ?").run(folder);
+    const rows = db.prepare(`
+        SELECT id, nick, text, date
+        FROM entries
+        WHERE folder = ?
+        ORDER BY id ASC
+    `).all(folder);
 
-    try {
-        await fs.remove(path.join(TITLES_DIR, folder));
-    } catch (e) { /* ignore */ }
+    res.json(rows);
+});
+
+// Admin title sil
+app.delete("/api/admin/delete-title/:folder", requireAdmin, (req, res) => {
+    const folder = req.params.folder;
+
+    db.prepare(`DELETE FROM entries WHERE folder = ?`).run(folder);
+    db.prepare(`DELETE FROM titles WHERE folder = ?`).run(folder);
+
+    fs.removeSync(path.join(TITLES_DIR, folder));
 
     res.json({ ok: true });
 });
 
+// Admin entry sil
 app.delete("/api/admin/delete-entry/:folder/:id", requireAdmin, (req, res) => {
-    const { folder, id } = req.params;
-    db.prepare(`DELETE FROM entries WHERE id = ? AND folder = ?`).run(id, folder);
+    db.prepare(`DELETE FROM entries WHERE id = ? AND folder = ?`)
+        .run(req.params.id, req.params.folder);
+
     res.json({ ok: true });
-});
-
-app.get("/api/admin/stats", requireAdmin, (req, res) => {
-    const titlesCount = db.prepare("SELECT COUNT(*) as c FROM titles").get().c;
-    const entriesCount = db.prepare("SELECT COUNT(*) as c FROM entries").get().c;
-    const lastTitle = db.prepare("SELECT title FROM titles ORDER BY id DESC LIMIT 1").get();
-    const lastEntry = db.prepare("SELECT text FROM entries ORDER BY id DESC LIMIT 1").get();
-
-    res.json({
-        titles: titlesCount,
-        entries: entriesCount,
-        lastTitle: lastTitle ? lastTitle.title : null,
-        lastEntry: lastEntry ? lastEntry.text : null
-    });
 });
 
 function generateTitleHTML(title) {
