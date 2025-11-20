@@ -16,10 +16,6 @@ const ADMIN_HASH = "$2b$10$L2nKB5QyIiVYq7ehQBwXReTwqjYxhFTU60sOvJFiypHJD2OX2tEaK
 const ACTIVE_ADMIN_TOKENS = new Set();
 function makeToken() { return crypto.randomBytes(24).toString("hex"); }
 
-const fs = require("fs-extra");
-fs.ensureDirSync("./data");
-
-
 const Database = require("better-sqlite3");
 const db = new Database("./data/words.db");
 
@@ -40,9 +36,9 @@ CREATE TABLE IF NOT EXISTS entries (
 );
 `);
 
-app.use(express.static("public"));
-app.use("/titles", express.static(path.join(__dirname, "titles"))); // <-- önemli
 app.use("/admin", express.static(path.join(__dirname, "admin")));
+app.use(express.static("public"));
+app.use("/titles", express.static(path.join(__dirname, "titles"))); // <-- öneml
 
 app.get("/admin", (req, res) => {
     res.sendFile(path.join(__dirname, "admin", "index.html"));
