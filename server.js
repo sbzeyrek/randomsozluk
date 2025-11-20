@@ -16,6 +16,10 @@ const ADMIN_HASH = "$2b$10$L2nKB5QyIiVYq7ehQBwXReTwqjYxhFTU60sOvJFiypHJD2OX2tEaK
 const ACTIVE_ADMIN_TOKENS = new Set();
 function makeToken() { return crypto.randomBytes(24).toString("hex"); }
 
+const fs = require("fs-extra");
+fs.ensureDirSync("./data");
+
+
 const Database = require("better-sqlite3");
 const db = new Database("./data/words.db");
 
