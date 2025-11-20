@@ -40,6 +40,10 @@ app.use(express.static("public"));
 app.use("/titles", express.static(path.join(__dirname, "titles"))); // <-- önemli
 app.use("/admin", express.static(path.join(__dirname, "admin")));
 
+app.get("/admin", (req, res) => {
+    res.sendFile(path.join(__dirname, "admin", "index.html"));
+});
+
 
 const TITLES_DIR = path.join(__dirname, "titles");
 
