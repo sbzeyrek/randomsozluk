@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>randomsozluk</title>
+<title>kullanici - randomsozluk</title>
 <style>
     body{margin:0;background-color:#5a5a1e;font-family:Verdana,Arial,sans-serif;color:#e1e1b0;font-size:12px;}
     a{color:#ffec8f;text-decoration:none;}
@@ -14,24 +14,17 @@
     .entry-count{color:#b8b894;font-size:10px;float:right;}
     #content{margin-left:210px;padding:25px;width:650px;}
     h1{font-family:"Comic Sans MS";font-size:40px;text-align:center;color:#ffdf00;text-shadow:2px 2px 3px black;margin:0;}
-    #subtitle{text-align:center;font-size:15px;margin-bottom:25px;}
     .box{background-color:#464619;padding:15px;border:1px solid #242400;margin-bottom:20px;}
-    input[type=text]{width:95%;padding:5px;background-color:#dfdfc3;border:1px solid #333;font-size:12px;}
-    textarea{width:95%;height:130px;padding:5px;background-color:white;border:1px solid #111;font-size:12px;color:black;}
-    button{background-color:#e3bf00;border:1px solid black;padding:5px 12px;cursor:pointer;margin-top:10px;font-family:Verdana,Arial,sans-serif;}
+    .entry-item{background-color:#3c3c14;padding:8px;border:1px solid #222;margin-bottom:6px;font-size:11px;}
+    .entry-title{color:#ffec8f;}
+    .entry-text{color:#c8c8a0;margin-top:4px;white-space:pre-wrap;word-break:break-word;}
     #userbar{text-align:right;margin-bottom:10px;font-size:11px;color:#b8b894;}
     #userbar a{color:#ffec8f;}
-    #msg{margin-top:8px;font-size:11px;color:#f99;}
     @media(max-width:768px){
         #left{position:static;width:100%;height:auto;border-right:none;padding:10px;box-sizing:border-box;}
         #searchBox{width:100%;box-sizing:border-box;}
-        #titleList a{font-size:14px;padding:8px 0;}
         #content{margin-left:0;width:100%;padding:15px;box-sizing:border-box;}
         h1{font-size:28px;}
-        #subtitle{font-size:14px;}
-        .box{padding:10px;}
-        input[type=text],textarea,button{width:100%;box-sizing:border-box;font-size:14px;}
-        textarea{height:110px;}
     }
 </style>
 </head>
@@ -46,29 +39,17 @@
 <div id="content">
     <h1><a href="/">randomsozluk</a></h1>
     <div id="userbar"></div>
-    <div id="subtitle">
-        random bilgi kaynagi<br><br>
-        cayklakliga dayanamadim bende kendiminkini yazdim arkadaslar hosgeldiniz.<br>
-        oyle takilin simdilik. ciddiyete gerek filan yok kafaniza gore. sallayin.
+    <div class="box">
+        <h2 id="profileNick" style="margin:0 0 6px 0;">...</h2>
+        <span id="joinDate" style="color:#6a6a4a;font-size:10px;"></span>
     </div>
-    <div id="newTitleBox" class="box">
-        <h3>yeni baslik ac</h3>
-        <div id="loginWarning" style="display:none;color:#f99;font-size:11px;margin-bottom:8px;">
-            baslik acmak icin <a href="/giris.html">giris yapman</a> lazim.
-        </div>
-        <input type="text" id="newTitle" placeholder="baslik adi">
-        <br><br>
-        <h4>ilk entry</h4>
-        <textarea id="firstEntryText" placeholder="noronlarindan gecenler"></textarea>
-        <br>
-        <button onclick="addTitleWithEntry()">baslik ve entry ekle</button>
-        <div id="msg"></div>
+    <div class="box">
+        <div style="color:#b8b894;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">son entry'ler</div>
+        <div id="entries"><i>yukleniyor...</i></div>
     </div>
 </div>
 
 <script>
-let currentUser = null;
-
 function esc(s){
     if(typeof s!=="string")return"";
     return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
@@ -80,11 +61,9 @@ async function loadMe(){
     const d=await r.json();
     const bar=document.getElementById("userbar");
     if(d.loggedIn){
-        currentUser=d;
         bar.innerHTML='merhaba <a href="/dashboard.html"><b>'+esc(d.nick)+'</b></a> &nbsp;|&nbsp; <a href="#" onclick="doLogout()">cikis</a>';
     }else{
         bar.innerHTML='<a href="/giris.html">giris yap</a> &nbsp;|&nbsp; <a href="/kayit.html">kayit ol</a>';
-        document.getElementById("loginWarning").style.display="block";
     }
 }
 
@@ -93,34 +72,44 @@ async function doLogout(){
     location.reload();
 }
 
+async function loadProfile(){
+    const params=new URLSearchParams(location.search);
+    const nick=params.get("nick");
+    if(!nick){document.getElementById("profileNick").innerText="kullanici bulunamadi";return;}
+    const r=await fetch("/api/user/"+encodeURIComponent(nick));
+    const d=await r.json();
+    if(d.error){document.getElementById("profileNick").innerText=d.error;document.getElementById("entries").innerHTML="";return;}
+    document.title=esc(d.nick)+" - randomsozluk";
+    document.getElementById("profileNick").innerText=d.nick;
+    const joined=new Date(d.created_at);
+    document.getElementById("joinDate").innerText="katilim: "+joined.toLocaleDateString("tr-TR");
+    const box=document.getElementById("entries");
+    if(!d.entries.length){box.innerHTML="<i>hic entry yok</i>";return;}
+    box.innerHTML="";
+    d.entries.forEach(e=>{
+        let dt=new Date(e.date);
+        let div=document.createElement("div");
+        div.className="entry-item";
+        div.innerHTML=
+            '<span class="entry-title"><a href="/titles/'+esc(e.folder)+'/index.html">'+esc(e.title||e.folder)+'</a></span>'+
+            ' &mdash; <span style="color:#6a6a4a;font-size:10px;">'+dt.toLocaleDateString("tr-TR")+'</span>'+
+            '<div class="entry-text">'+esc(e.text.slice(0,200))+(e.text.length>200?'...':'')+'</div>';
+        box.appendChild(div);
+    });
+}
+
 async function loadTitles(){
     const r=await fetch("/api/titles");
-    const titles=await r.json();
-    const list=document.getElementById("titleList");
-    list.innerHTML="";
-    if(titles.length===0){list.innerHTML="<i>henuz baslik yok</i>";return;}
-    titles.forEach(t=>{
+    const list=await r.json();
+    const div=document.getElementById("titleList");
+    div.innerHTML="";
+    list.forEach(t=>{
         let a=document.createElement("a");
         a.href="/titles/"+t.folder+"/index.html";
         let c=t.count>0?' <span class="entry-count">('+t.count+')</span>':"";
         a.innerHTML=esc(t.title)+c;
-        list.appendChild(a);
+        div.appendChild(a);
     });
-}
-
-async function addTitleWithEntry(){
-    const msg=document.getElementById("msg");
-    if(!currentUser){msg.innerText="giris yapman lazim";return;}
-    const title=document.getElementById("newTitle").value.trim();
-    const text=document.getElementById("firstEntryText").value.trim();
-    if(!title||!text){msg.innerText="bos birakma!";return;}
-    const r=await fetch("/api/new-title",{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({title,text})
-    });
-    const data=await r.json();
-    if(data.error){msg.innerText=data.error;return;}
-    window.location.href="/titles/"+data.folder+"/index.html";
 }
 
 function filterTitles(){
@@ -130,8 +119,7 @@ function filterTitles(){
     });
 }
 
-loadMe();
-loadTitles();
+loadMe();loadTitles();loadProfile();
 </script>
 </body>
 </html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>hesabim - randomsozluk</title>
+<style>
+    body{margin:0;background-color:#5a5a1e;font-family:Verdana,Arial,sans-serif;color:#e1e1b0;font-size:12px;}
+    a{color:#ffec8f;text-decoration:none;}
+    a:hover{text-decoration:underline;}
+    #left{width:180px;background-color:#464619;height:100vh;overflow-y:auto;border-right:1px solid #242400;padding:10px;position:fixed;top:0;left:0;}
+    #searchBox{width:160px;padding:4px;background-color:#dfdfc3;border:1px solid #333;margin-bottom:10px;}
+    #titleList a{display:block;padding:4px 0;border-bottom:1px solid #555;font-size:12px;}
+    .entry-count{color:#b8b894;font-size:10px;float:right;}
+    #content{margin-left:210px;padding:25px;width:650px;}
+    h1{font-family:"Comic Sans MS";font-size:40px;text-align:center;color:#ffdf00;text-shadow:2px 2px 3px black;margin:0;}
+    .box{background-color:#464619;padding:15px;border:1px solid #242400;margin-bottom:20px;}
+    input[type=text],input[type=password]{width:95%;padding:5px;background-color:#dfdfc3;border:1px solid #333;font-size:12px;color:black;margin-bottom:8px;}
+    .btn{background-color:#e3bf00;border:1px solid black;padding:5px 12px;cursor:pointer;font-family:Verdana,Arial,sans-serif;font-size:12px;}
+    .btn-red{background-color:#7a2020;border:1px solid #300;color:#ffaaaa;}
+    .msg{font-size:11px;margin-top:6px;}
+    .msg.ok{color:#7fa;}
+    .msg.err{color:#f99;}
+    #userbar{text-align:right;margin-bottom:10px;font-size:11px;color:#b8b894;}
+    #userbar a{color:#ffec8f;}
+    .entry-item{background-color:#3c3c14;padding:8px;border:1px solid #222;margin-bottom:6px;font-size:11px;}
+    .entry-item .entry-title{color:#ffec8f;font-size:11px;}
+    .entry-item .entry-text{color:#c8c8a0;margin-top:4px;white-space:pre-wrap;word-break:break-word;}
+    .section-title{color:#b8b894;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+    @media(max-width:768px){
+        #left{position:static;width:100%;height:auto;border-right:none;padding:10px;box-sizing:border-box;}
+        #searchBox{width:100%;box-sizing:border-box;}
+        #content{margin-left:0;width:100%;padding:15px;box-sizing:border-box;}
+        h1{font-size:28px;}
+        input[type=text],input[type=password],.btn{width:100%;box-sizing:border-box;}
+    }
+</style>
+</head>
+<body>
+
+<div id="left">
+    <input type="text" id="searchBox" placeholder="baslik ara" onkeyup="filterTitles()">
+    <h4>basliklar</h4>
+    <div id="titleList"></div>
+</div>
+
+<div id="content">
+    <h1><a href="/">randomsozluk</a></h1>
+    <div id="userbar"></div>
+
+    <div class="box">
+        <div class="section-title">hesabim</div>
+        <p>nick: <b id="currentNick">...</b></p>
+        <a href="#" onclick="doLogout()" class="btn btn-red">cikis yap</a>
+    </div>
+
+    <div class="box">
+        <div class="section-title">nick degistir</div>
+        <input type="text" id="newNick" placeholder="yeni nick" oninput="this.value=this.value.toLowerCase()">
+        <input type="password" id="nickPassword" placeholder="mevcut sifren">
+        <br>
+        <button class="btn" onclick="changeNick()">nick degistir</button>
+        <div id="nickMsg" class="msg"></div>
+    </div>
+
+    <div class="box">
+        <div class="section-title">sifre degistir</div>
+        <input type="password" id="oldPassword" placeholder="mevcut sifre">
+        <input type="password" id="newPassword" placeholder="yeni sifre (min 4 karakter)">
+        <input type="password" id="newPassword2" placeholder="yeni sifre tekrar">
+        <br>
+        <button class="btn" onclick="changePassword()">sifre degistir</button>
+        <div id="passMsg" class="msg"></div>
+    </div>
+
+    <div class="box">
+        <div class="section-title">entry'lerim</div>
+        <div id="myEntries"><i>yukleniyor...</i></div>
+    </div>
+</div>
+
+<script>
+let currentUser = null;
+
+function esc(s){
+    if(typeof s!=="string")return"";
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+            .replace(/"/g,"&quot;").replace(/'/g,"&#x27;");
+}
+
+async function loadMe(){
+    const r=await fetch("/api/me");
+    const d=await r.json();
+    if(!d.loggedIn){window.location.href="/giris.html";return;}
+    currentUser=d;
+    document.getElementById("currentNick").innerText=d.nick;
+    const bar=document.getElementById("userbar");
+    bar.innerHTML='merhaba <b>'+esc(d.nick)+'</b> &nbsp;|&nbsp; <a href="/">ana sayfa</a>';
+}
+
+async function doLogout(){
+    await fetch("/api/logout",{method:"POST"});
+    window.location.href="/";
+}
+
+async function changeNick(){
+    const msg=document.getElementById("nickMsg");
+    const newNick=document.getElementById("newNick").value.trim().toLowerCase();
+    const password=document.getElementById("nickPassword").value;
+    if(!newNick||!password){setMsg(msg,"bos birakma","err");return;}
+    const r=await fetch("/api/dashboard/change-nick",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({newNick,password})
+    });
+    const d=await r.json();
+    if(d.error){setMsg(msg,d.error,"err");return;}
+    setMsg(msg,"nick degistirildi: "+esc(d.nick),"ok");
+    document.getElementById("currentNick").innerText=d.nick;
+    document.getElementById("newNick").value="";
+    document.getElementById("nickPassword").value="";
+    loadMyEntries();
+}
+
+async function changePassword(){
+    const msg=document.getElementById("passMsg");
+    const oldPassword=document.getElementById("oldPassword").value;
+    const newPassword=document.getElementById("newPassword").value;
+    const newPassword2=document.getElementById("newPassword2").value;
+    if(!oldPassword||!newPassword){setMsg(msg,"bos birakma","err");return;}
+    if(newPassword!==newPassword2){setMsg(msg,"sifreler uyusmuyor","err");return;}
+    const r=await fetch("/api/dashboard/change-password",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({oldPassword,newPassword})
+    });
+    const d=await r.json();
+    if(d.error){setMsg(msg,d.error,"err");return;}
+    setMsg(msg,"sifre basariyla degistirildi","ok");
+    document.getElementById("oldPassword").value="";
+    document.getElementById("newPassword").value="";
+    document.getElementById("newPassword2").value="";
+}
+
+async function loadMyEntries(){
+    const r=await fetch("/api/dashboard/my-entries");
+    const list=await r.json();
+    const box=document.getElementById("myEntries");
+    if(!list.length){box.innerHTML="<i>hic entry atmamissin</i>";return;}
+    box.innerHTML="";
+    list.forEach(e=>{
+        let d=new Date(e.date);
+        let dateStr=d.toLocaleDateString("tr-TR")+" "+d.toLocaleTimeString("tr-TR");
+        let div=document.createElement("div");
+        div.className="entry-item";
+        div.innerHTML=
+            '<span class="entry-title"><a href="/titles/'+e.folder+'/index.html">'+esc(e.title||e.folder)+'</a></span>'+
+            ' &mdash; <span style="color:#6a6a4a;font-size:10px;">'+dateStr+'</span>'+
+            '<div class="entry-text">'+esc(e.text.slice(0,200))+(e.text.length>200?'...':'')+'</div>';
+        box.appendChild(div);
+    });
+}
+
+function setMsg(el,text,type){
+    el.innerText=text;
+    el.className="msg "+(type||"");
+}
+
+async function loadTitles(){
+    const r=await fetch("/api/titles");
+    const list=await r.json();
+    const div=document.getElementById("titleList");
+    div.innerHTML="";
+    list.forEach(t=>{
+        let a=document.createElement("a");
+        a.href="/titles/"+t.folder+"/index.html";
+        let c=t.count>0?' <span class="entry-count">('+t.count+')</span>':"";
+        a.innerHTML=esc(t.title)+c;
+        div.appendChild(a);
+    });
+}
+
+function filterTitles(){
+    const q=document.getElementById("searchBox").value.toLowerCase();
+    document.querySelectorAll("#titleList a").forEach(a=>{
+        a.style.display=a.innerText.toLowerCase().includes(q)?"block":"none";
+    });
+}
+
+(async()=>{await loadMe();loadTitles();loadMyEntries();})();
+</script>
+</body>
+</html>

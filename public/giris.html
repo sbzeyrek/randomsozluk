@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>giris yap - randomsozluk</title>
+<style>
+    body{margin:0;background-color:#5a5a1e;font-family:Verdana,Arial,sans-serif;color:#e1e1b0;font-size:12px;}
+    a{color:#ffec8f;text-decoration:none;}
+    a:hover{text-decoration:underline;}
+    .center{display:flex;justify-content:center;align-items:center;min-height:100vh;}
+    .box{background-color:#464619;padding:30px 25px;border:1px solid #242400;width:300px;}
+    h1{font-family:"Comic Sans MS";font-size:28px;text-align:center;color:#ffdf00;text-shadow:2px 2px 3px black;margin:0 0 20px 0;}
+    h2{text-align:center;margin:0 0 20px 0;font-size:14px;font-weight:normal;color:#b8b894;}
+    input{width:100%;padding:7px;background-color:#dfdfc3;border:1px solid #333;font-size:12px;color:black;box-sizing:border-box;margin-bottom:10px;}
+    button{width:100%;background-color:#e3bf00;border:1px solid black;padding:7px;cursor:pointer;font-family:Verdana,Arial,sans-serif;font-size:12px;margin-top:4px;}
+    #msg{color:#f99;font-size:11px;margin-top:8px;text-align:center;}
+    .altlink{text-align:center;margin-top:14px;font-size:11px;color:#b8b894;}
+</style>
+</head>
+<body>
+<div class="center">
+    <div class="box">
+        <h1><a href="/">randomsozluk</a></h1>
+        <h2>giris yap</h2>
+        <input type="text" id="nick" placeholder="nick" autocomplete="username">
+        <input type="password" id="password" placeholder="sifre" autocomplete="current-password">
+        <button onclick="doLogin()">giris</button>
+        <div id="msg"></div>
+        <div class="altlink">hesabin yok mu? <a href="/kayit.html">kayit ol</a></div>
+    </div>
+</div>
+<script>
+document.addEventListener("keydown", e => { if(e.key==="Enter") doLogin(); });
+
+async function doLogin(){
+    const msg=document.getElementById("msg");
+    const nick=document.getElementById("nick").value.trim();
+    const password=document.getElementById("password").value;
+    if(!nick||!password){msg.innerText="bos birakma";return;}
+    const r=await fetch("/api/login",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({nick,password})
+    });
+    const d=await r.json();
+    if(d.error){msg.innerText=d.error;return;}
+    window.location.href="/";
+}
+</script>
+</body>
+</html>
