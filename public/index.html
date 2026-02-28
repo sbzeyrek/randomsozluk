@@ -101,7 +101,7 @@ async function loadTitles(){
     if(titles.length===0){list.innerHTML="<i>henuz baslik yok</i>";return;}
     titles.forEach(t=>{
         let a=document.createElement("a");
-        a.href="/titles/"+t.folder+"/index.html";
+        a.href="/t/"+t.slug;
         let c=t.count>0?' <span class="entry-count">('+t.count+')</span>':"";
         a.innerHTML=esc(t.title)+c;
         list.appendChild(a);
@@ -120,7 +120,7 @@ async function addTitleWithEntry(){
     });
     const data=await r.json();
     if(data.error){msg.innerText=data.error;return;}
-    window.location.href="/titles/"+data.folder+"/index.html";
+    window.location.href="/t/"+data.slug;
 }
 
 function filterTitles(){

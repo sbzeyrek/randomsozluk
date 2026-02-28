@@ -91,7 +91,7 @@ async function loadProfile(){
         let div=document.createElement("div");
         div.className="entry-item";
         div.innerHTML=
-            '<span class="entry-title"><a href="/titles/'+esc(e.folder)+'/index.html">'+esc(e.title||e.folder)+'</a></span>'+
+            '<span class="entry-title"><a href="/t/'+esc(e.slug)+'/index.html">'+esc(e.title||e.slug)+'</a></span>'+
             ' &mdash; <span style="color:#6a6a4a;font-size:10px;">'+dt.toLocaleDateString("tr-TR")+'</span>'+
             '<div class="entry-text">'+esc(e.text.slice(0,200))+(e.text.length>200?'...':'')+'</div>';
         box.appendChild(div);
@@ -105,7 +105,7 @@ async function loadTitles(){
     div.innerHTML="";
     list.forEach(t=>{
         let a=document.createElement("a");
-        a.href="/titles/"+t.folder+"/index.html";
+        a.href="/t/"+t.slug;
         let c=t.count>0?' <span class="entry-count">('+t.count+')</span>':"";
         a.innerHTML=esc(t.title)+c;
         div.appendChild(a);
