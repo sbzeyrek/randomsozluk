@@ -21,6 +21,12 @@ function makeToken() {
     return crypto.randomBytes(32).toString("hex");
 }
 
+// Cookie secenekleri - Render HTTPS'te secure:true, local'de false
+const IS_PROD = process.env.NODE_ENV === "production";
+function cookieOpts(maxAge) {
+    return { httpOnly: true, sameSite: IS_PROD ? "lax" : "lax", secure: IS_PROD, maxAge };
+}
+
 // ============================
 //  XSS escape
 // ============================
@@ -184,7 +190,7 @@ app.post("/api/login", async (req, res) => {
     const token = makeToken();
     db.prepare("INSERT INTO user_sessions (token, user_id, created_at) VALUES (?, ?, ?)")
         .run(token, user.id, new Date().toISOString());
-    res.cookie("user_token", token, { httpOnly: true, sameSite: "lax", secure: true, maxAge: 7*24*60*60*1000 });
+    res.cookie("user_token", token, cookieOpts(7*24*60*60*1000));
     res.json({ ok: true, nick: user.nick });
 });
 
@@ -218,7 +224,7 @@ app.post("/api/dashboard/change-password", requireUser, async (req, res) => {
     const token = makeToken();
     db.prepare("INSERT INTO user_sessions (token, user_id, created_at) VALUES (?, ?, ?)")
         .run(token, req.user.id, new Date().toISOString());
-    res.cookie("user_token", token, { httpOnly: true, sameSite: "lax", secure: true, maxAge: 7*24*60*60*1000 });
+    res.cookie("user_token", token, cookieOpts(7*24*60*60*1000));
     res.json({ ok: true });
 });
 
@@ -380,7 +386,7 @@ app.post("/api/admin/login", async (req, res) => {
     if (!ok) return res.json({ error: "yanlis parola" });
     const token = makeToken();
     ACTIVE_ADMIN_TOKENS.add(token);
-    res.cookie("admin_token", token, { httpOnly: true, sameSite: "lax", secure: true, maxAge: 86400000 });
+    res.cookie("admin_token", token, cookieOpts(86400000));
     res.json({ ok: true });
 });
 
@@ -602,28 +608,35 @@ async function send(){
   if(!text.trim()){msg.className="err";msg.innerText="entry bos olamaz";return;}
   text = text.toLowerCase();
 
-  const d = await fetch("/api/title/"+SLUG+"/add",{
-    method:"POST", headers:{"Content-Type":"application/json"},
-    credentials:"include",
-    body: JSON.stringify({text})
-  }).then(r=>r.json());
+  let resp, d;
+  try {
+    resp = await fetch("/api/title/"+SLUG+"/add",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      credentials:"include",
+      body: JSON.stringify({text})
+    });
+    d = await resp.json();
+  } catch(e) {
+    msg.className="err";
+    msg.innerText = "baglanti hatasi: "+e.message;
+    return;
+  }
 
-  if(d.error){msg.className="err";msg.innerText=d.error;return;}
+  if(!resp.ok || d.error){
+    msg.className="err";
+    msg.innerText = d.error || ("hata: "+resp.status+" - giris yapman gerekiyor olabilir");
+    return;
+  }
 
-  // Sayfayi yenilemeden yeni entry'i ekle
+  // Basarili: textarea temizle, mesaj goster
   document.getElementById("text").value = "";
   msg.className="ok2";
   msg.innerText = "entry eklendi!";
-  setTimeout(()=>{msg.innerText="";},2000);
+  setTimeout(()=>{ msg.innerText=""; },2500);
 
-  // Yeni entry'i aninda goster
-  const entries = await fetch("/api/title/"+SLUG, {credentials:"include"}).then(r=>r.json());
-  const newEntry = entries[entries.length-1];
-  const div = document.getElementById("entries");
-  if(div.querySelector("div[style]")) div.innerHTML = ""; // "henuz entry yok" yazisini temizle
-  renderEntry(newEntry, div);
-
-  // Sidebar sayacini guncelle
+  // Tum entryleri yeniden yukle (en saglam yontem)
+  load();
   loadTitles();
 }
 
