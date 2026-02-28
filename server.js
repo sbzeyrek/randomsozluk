@@ -38,14 +38,14 @@ function escHtml(str) {
 //  YARDIMCI: Guvenli folder adi
 // ============================
 function toSafeFolder(title) {
+    // Bosluglar tire olur, Turkce harfler ve latin harfler, rakamlar, tire kalir
     return title
         .toLowerCase()
-        .replace(/\u011f/g, "g").replace(/\u00fc/g, "u").replace(/\u015f/g, "s")
-        .replace(/\u0131/g, "i").replace(/\u00f6/g, "o").replace(/\u00e7/g, "c")
-        .replace(/[^a-z0-9\s-]/g, "")
         .trim()
-        .replace(/\s+/g, "-")
+        .replace(/ /g, "-")
+        .replace(/[^a-z0-9çğışöü\-]/g, "")
         .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "")
         .slice(0, 80);
 }
 
@@ -319,7 +319,7 @@ app.post("/api/new-title", requireUser, (req, res) => {
 //  API: Baslik entry'leri + oy sayilari
 // ============================
 app.get("/api/title/:name", (req, res) => {
-    const folder = req.params.name.replace(/[^a-z0-9\-]/g, "");
+    const folder = req.params.name.replace(/[^a-z0-9çğışöü\-]/g, "");
     const user = getUser(req);
     const userId = user ? user.id : null;
 
@@ -349,7 +349,7 @@ app.get("/api/title/:name", (req, res) => {
 // ============================
 app.post("/api/title/:name/add", requireUser, (req, res) => {
     let { text } = req.body;
-    const folder = req.params.name.replace(/[^a-z0-9\-]/g, "");
+    const folder = req.params.name.replace(/[^a-z0-9çğışöü\-]/g, "");
     const user = req.user;
 
     if (!text || !text.trim()) return res.json({ error: "entry bos olamaz" });
@@ -447,13 +447,13 @@ app.get("/api/admin/titles", requireAdmin, (req, res) => {
 });
 
 app.get("/api/admin/title/:folder", requireAdmin, (req, res) => {
-    const folder = req.params.folder.replace(/[^a-z0-9\-]/g, "");
+    const folder = req.params.folder.replace(/[^a-z0-9çğışöü\-]/g, "");
     const rows = db.prepare("SELECT id, nick, text, date FROM entries WHERE folder = ? ORDER BY id ASC").all(folder);
     res.json(rows);
 });
 
 app.delete("/api/admin/delete-title/:folder", requireAdmin, (req, res) => {
-    const folder = req.params.folder.replace(/[^a-z0-9\-]/g, "");
+    const folder = req.params.folder.replace(/[^a-z0-9çğışöü\-]/g, "");
     db.prepare("DELETE FROM votes WHERE entry_id IN (SELECT id FROM entries WHERE folder = ?)").run(folder);
     db.prepare("DELETE FROM entries WHERE folder = ?").run(folder);
     db.prepare("DELETE FROM titles WHERE folder = ?").run(folder);
@@ -464,7 +464,7 @@ app.delete("/api/admin/delete-title/:folder", requireAdmin, (req, res) => {
 
 app.delete("/api/admin/delete-entry/:folder/:id", requireAdmin, (req, res) => {
     const id = parseInt(req.params.id);
-    const folder = req.params.folder.replace(/[^a-z0-9\-]/g, "");
+    const folder = req.params.folder.replace(/[^a-z0-9çğışöü\-]/g, "");
     if (isNaN(id)) return res.json({ error: "gecersiz id" });
     db.prepare("DELETE FROM votes WHERE entry_id = ?").run(id);
     db.prepare("DELETE FROM entries WHERE id = ? AND folder = ?").run(id, folder);
@@ -654,4 +654,25 @@ function filterTitles(){
 </html>`;
 }
 
-app.listen(3000, () => console.log("caliyor: http://localhost:3000"));
+// ============================
+//  STARTUP: Eksik statik HTML'leri olustur
+// ============================
+function regenerateMissingTitles() {
+    const titles = db.prepare("SELECT * FROM titles").all();
+    let count = 0;
+    titles.forEach(t => {
+        const titlePath = path.join(TITLES_DIR, t.folder);
+        const htmlPath = path.join(titlePath, "index.html");
+        if (!fs.existsSync(htmlPath)) {
+            fs.ensureDirSync(titlePath);
+            fs.writeFileSync(htmlPath, generateTitleHTML(t.title, t.folder));
+            count++;
+        }
+    });
+    if (count > 0) console.log("eksik " + count + " baslik HTML'i olusturuldu");
+}
+
+app.listen(3000, () => {
+    regenerateMissingTitles();
+    console.log("caliyor: http://localhost:3000");
+});
