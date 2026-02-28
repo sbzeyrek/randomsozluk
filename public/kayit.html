@@ -45,7 +45,7 @@ async function doRegister(){
     if(!nick||!password){msg.innerText="bos birakma";return;}
     if(password!==password2){msg.innerText="sifreler uyusmuyor";return;}
     const r=await fetch("/api/register",{
-        method:"POST",headers:{"Content-Type":"application/json"},
+        method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({nick,password})
     });
     const d=await r.json();

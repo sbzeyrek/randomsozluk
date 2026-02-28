@@ -57,7 +57,7 @@ function esc(s){
 }
 
 async function loadMe(){
-    const r=await fetch("/api/me");
+    const r=await fetch("/api/me",{credentials:"include"});
     const d=await r.json();
     const bar=document.getElementById("userbar");
     if(d.loggedIn){
@@ -68,7 +68,7 @@ async function loadMe(){
 }
 
 async function doLogout(){
-    await fetch("/api/logout",{method:"POST"});
+    await fetch("/api/logout",{method:"POST",credentials:"include"});
     location.reload();
 }
 
@@ -99,7 +99,7 @@ async function loadProfile(){
 }
 
 async function loadTitles(){
-    const r=await fetch("/api/titles");
+    const r=await fetch("/api/titles",{credentials:"include"});
     const list=await r.json();
     const div=document.getElementById("titleList");
     div.innerHTML="";

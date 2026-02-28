@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const Database = require("better-sqlite3");
 
 const app = express();
+app.set("trust proxy", 1); // Render reverse proxy
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -183,7 +184,7 @@ app.post("/api/login", async (req, res) => {
     const token = makeToken();
     db.prepare("INSERT INTO user_sessions (token, user_id, created_at) VALUES (?, ?, ?)")
         .run(token, user.id, new Date().toISOString());
-    res.cookie("user_token", token, { httpOnly: true, sameSite: "strict", secure: false, maxAge: 7*24*60*60*1000 });
+    res.cookie("user_token", token, { httpOnly: true, sameSite: "lax", secure: true, maxAge: 7*24*60*60*1000 });
     res.json({ ok: true, nick: user.nick });
 });
 
@@ -217,7 +218,7 @@ app.post("/api/dashboard/change-password", requireUser, async (req, res) => {
     const token = makeToken();
     db.prepare("INSERT INTO user_sessions (token, user_id, created_at) VALUES (?, ?, ?)")
         .run(token, req.user.id, new Date().toISOString());
-    res.cookie("user_token", token, { httpOnly: true, sameSite: "strict", secure: false, maxAge: 7*24*60*60*1000 });
+    res.cookie("user_token", token, { httpOnly: true, sameSite: "lax", secure: true, maxAge: 7*24*60*60*1000 });
     res.json({ ok: true });
 });
 
@@ -379,7 +380,7 @@ app.post("/api/admin/login", async (req, res) => {
     if (!ok) return res.json({ error: "yanlis parola" });
     const token = makeToken();
     ACTIVE_ADMIN_TOKENS.add(token);
-    res.cookie("admin_token", token, { httpOnly: true, sameSite: "strict", secure: false, maxAge: 86400000 });
+    res.cookie("admin_token", token, { httpOnly: true, sameSite: "lax", secure: true, maxAge: 86400000 });
     res.json({ ok: true });
 });
 
@@ -512,7 +513,7 @@ function esc(s){
 }
 
 async function loadMe(){
-  const d = await fetch("/api/me").then(r=>r.json());
+  const d = await fetch("/api/me", {credentials:"include"}).then(r=>r.json());
   const bar = document.getElementById("userbar");
   if(d.loggedIn){
     currentUser = d;
@@ -525,12 +526,12 @@ async function loadMe(){
 }
 
 async function doLogout(){
-  await fetch("/api/logout",{method:"POST"});
+  await fetch("/api/logout",{method:"POST",credentials:"include"});
   location.reload();
 }
 
 async function loadTitles(){
-  const list = await fetch("/api/titles").then(r=>r.json());
+  const list = await fetch("/api/titles", {credentials:"include"}).then(r=>r.json());
   const div  = document.getElementById("titleList");
   div.innerHTML = "";
   list.forEach(t=>{
@@ -543,7 +544,7 @@ async function loadTitles(){
 }
 
 async function load(){
-  const data = await fetch("/api/title/"+SLUG).then(r=>r.json());
+  const data = await fetch("/api/title/"+SLUG, {credentials:"include"}).then(r=>r.json());
   const div  = document.getElementById("entries");
   div.innerHTML = "";
   if(!data.length){
@@ -580,6 +581,7 @@ async function vote(entryId, v){
   if(!currentUser) return;
   const d = await fetch("/api/vote/"+entryId,{
     method:"POST", headers:{"Content-Type":"application/json"},
+    credentials:"include",
     body: JSON.stringify({vote:v})
   }).then(r=>r.json());
   if(!d.ok) return;
@@ -602,6 +604,7 @@ async function send(){
 
   const d = await fetch("/api/title/"+SLUG+"/add",{
     method:"POST", headers:{"Content-Type":"application/json"},
+    credentials:"include",
     body: JSON.stringify({text})
   }).then(r=>r.json());
 
@@ -614,7 +617,7 @@ async function send(){
   setTimeout(()=>{msg.innerText="";},2000);
 
   // Yeni entry'i aninda goster
-  const entries = await fetch("/api/title/"+SLUG).then(r=>r.json());
+  const entries = await fetch("/api/title/"+SLUG, {credentials:"include"}).then(r=>r.json());
   const newEntry = entries[entries.length-1];
   const div = document.getElementById("entries");
   if(div.querySelector("div[style]")) div.innerHTML = ""; // "henuz entry yok" yazisini temizle

@@ -89,7 +89,7 @@ function esc(s){
 }
 
 async function loadMe(){
-    const r=await fetch("/api/me");
+    const r=await fetch("/api/me",{credentials:"include"});
     const d=await r.json();
     if(!d.loggedIn){window.location.href="/giris.html";return;}
     currentUser=d;
@@ -99,7 +99,7 @@ async function loadMe(){
 }
 
 async function doLogout(){
-    await fetch("/api/logout",{method:"POST"});
+    await fetch("/api/logout",{method:"POST",credentials:"include"});
     window.location.href="/";
 }
 
@@ -109,7 +109,7 @@ async function changeNick(){
     const password=document.getElementById("nickPassword").value;
     if(!newNick||!password){setMsg(msg,"bos birakma","err");return;}
     const r=await fetch("/api/dashboard/change-nick",{
-        method:"POST",headers:{"Content-Type":"application/json"},
+        method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({newNick,password})
     });
     const d=await r.json();
@@ -129,7 +129,7 @@ async function changePassword(){
     if(!oldPassword||!newPassword){setMsg(msg,"bos birakma","err");return;}
     if(newPassword!==newPassword2){setMsg(msg,"sifreler uyusmuyor","err");return;}
     const r=await fetch("/api/dashboard/change-password",{
-        method:"POST",headers:{"Content-Type":"application/json"},
+        method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({oldPassword,newPassword})
     });
     const d=await r.json();
@@ -165,7 +165,7 @@ function setMsg(el,text,type){
 }
 
 async function loadTitles(){
-    const r=await fetch("/api/titles");
+    const r=await fetch("/api/titles",{credentials:"include"});
     const list=await r.json();
     const div=document.getElementById("titleList");
     div.innerHTML="";

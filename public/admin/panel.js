@@ -7,7 +7,7 @@ function esc(s){
 async function login(){
     const password=document.getElementById("password").value;
     const r=await fetch("/api/admin/login",{
-        method:"POST",headers:{"Content-Type":"application/json"},
+        method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({password})
     });
     const j=await r.json();
@@ -19,7 +19,7 @@ async function login(){
 }
 
 async function logout(){
-    await fetch("/api/admin/logout",{method:"POST"});
+    await fetch("/api/admin/logout",{method:"POST",credentials:"include"});
     window.location="/admin/index.html";
 }
 
@@ -47,7 +47,7 @@ async function loadTitles(){
 
 async function deleteTitle(folder){
     if(!confirm("bu baslik ve tum entry'leri silinsin mi?"))return;
-    await fetch("/api/admin/delete-title/"+encodeURIComponent(folder),{method:"DELETE"});
+    await fetch("/api/admin/delete-title/"+encodeURIComponent(folder),{method:"DELETE",credentials:"include"});
     loadTitles();
     document.getElementById("entries").innerHTML="";
 }
@@ -72,7 +72,7 @@ async function showEntries(folder){
 
 async function deleteEntry(folder,id){
     if(!confirm("entry silinsin mi?"))return;
-    await fetch("/api/admin/delete-entry/"+encodeURIComponent(folder)+"/"+id,{method:"DELETE"});
+    await fetch("/api/admin/delete-entry/"+encodeURIComponent(folder)+"/"+id,{method:"DELETE",credentials:"include"});
     showEntries(folder);
 }
 
